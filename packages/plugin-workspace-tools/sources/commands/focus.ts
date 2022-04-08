@@ -2,7 +2,6 @@ import {BaseCommand, WorkspaceRequiredError}                                    
 import {Cache, Configuration, InstallMode, Manifest, Project, StreamReport, Workspace} from '@yarnpkg/core';
 import {structUtils}                                                                   from '@yarnpkg/core';
 import {Command, Option, Usage}                                                        from 'clipanion';
-import * as t                                                                          from 'typanion';
 
 // eslint-disable-next-line arca/no-default-export
 export default class WorkspacesFocus extends BaseCommand {
@@ -20,12 +19,8 @@ export default class WorkspacesFocus extends BaseCommand {
 
       If the \`-A,--all\` flag is set, the entire project will be installed. Combine with \`--production\` to replicate the old \`yarn install --production\`.
 
-      If the \`--mode=<mode>\` option is set, Yarn will change which artifacts are generated. The modes currently supported are:
-
-      - \`skip-build\` will not run the build scripts at all. Note that this is different from setting \`enableScripts\` to false because the later will disable build scripts, and thus affect the content of the artifacts generated on disk, whereas the former will just disable the build step - but not the scripts themselves, which just won't run.
-
-      - \`update-lockfile\` will skip the link step altogether, and only fetch packages that are missing from the lockfile (or that have no associated checksums). This mode is typically used by tools like Renovate or Dependabot to keep a lockfile up-to-date without incurring the full install cost.
-    `,
+      If the \`--skip-build\` will not run the build scripts at all. Note that this is different from setting \`enableScripts\` to false because the later will disable build scripts, and thus affect the content of the artifacts generated on disk, whereas the former will just disable the build step - but not the scripts themselves, which just won't run.
+      `,
   });
 
   json = Option.Boolean(`--json`, false, {
@@ -40,9 +35,8 @@ export default class WorkspacesFocus extends BaseCommand {
     description: `Install the entire project`,
   });
 
-  mode = Option.String(`--mode`, {
-    description: `Change what artifacts installs generate`,
-    validator: t.isEnum(InstallMode),
+  skipBuild = Option.Boolean(`--skip-build`, false, {
+    description: `Will not run the build scripts at all`,
   });
 
   workspaces = Option.Rest();
@@ -111,13 +105,15 @@ export default class WorkspacesFocus extends BaseCommand {
     // persist the project state on the disk (otherwise all workspaces would
     // lose their dependencies!).
 
+    const mode = this.skipBuild ? InstallMode.SkipBuild : undefined;
+
     const report = await StreamReport.start({
       configuration,
       json: this.json,
       stdout: this.context.stdout,
       includeLogs: true,
     }, async (report: StreamReport) => {
-      await project.install({cache, report, mode: this.mode, persistProject: false});
+      await project.install({cache, report, mode, persistProject: false});
     });
 
     return report.exitCode();
